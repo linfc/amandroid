@@ -19,6 +19,7 @@ import org.sireum.amandroid.util.AndroidLibraryAPISummary
 import org.sireum.jawa.util.Timer
 import org.sireum.amandroid.AppCenter
 import org.sireum.jawa.MessageCenter
+import org.sireum.jawa.alir.graphdb.GraphDB
 
 /**
  * @author <a href="mailto:fgwei@k-state.edu">Fengguo Wei</a>
@@ -47,7 +48,7 @@ object Staging_run {
 		  AppCenter.getInterproceduralReachingFactsAnalysisResults.foreach{
 		    res =>
 		      val idfg = res._2
-//		      GraphDB.storeIdfg(res._1.getName, idfg)
+		      GraphDB.storeIdfg(res._1.getName, idfg)
 		  }
 		  
     }
