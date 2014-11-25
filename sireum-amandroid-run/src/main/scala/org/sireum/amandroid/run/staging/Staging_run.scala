@@ -48,7 +48,8 @@ object Staging_run {
 		  AppCenter.getInterproceduralReachingFactsAnalysisResults.foreach{
 		    res =>
 		      val idfg = res._2
-		      GraphDB.storeIdfg(res._1.getName, idfg)
+		      val apk = FileUtil.filename(source_apk)
+		      GraphDB.storeIdfg(apk, res._1.getName, idfg)
 		  }
 		  
     }
