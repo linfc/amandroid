@@ -72,7 +72,7 @@ object GenCallGraphCli {
  */ 
 object GenCallGraph {
   
-  private final val TITLE = "Staging"
+  private final val TITLE = "GenCallGraph"
   
 	def main(args: Array[String]) {
 	  if(args.size != 6){
@@ -152,10 +152,11 @@ object GenCallGraph {
 
             new InterproceduralPointsToAnalysis().pta(pag, cg, pros, false)
           	
-            val file = new File(outputPath + "/" + apkName.filter(_.isUnicodeIdentifierPart) + ".xml.gz")
+            val file = new File(outputPath + "/" + apkName.filter(_.isUnicodeIdentifierPart) + ".txt.gz")
       	    val w = new FileOutputStream(file)
             val zipw = new GZIPOutputStream(new BufferedOutputStream(w))
-      	    AndroidXStream.toXml(cg, zipw)
+      	    val graph = cg.toTextGraph
+      	    zipw.write(graph.getBytes())
       	    zipw.close()
       	    println(apkName + " result stored!")
             
