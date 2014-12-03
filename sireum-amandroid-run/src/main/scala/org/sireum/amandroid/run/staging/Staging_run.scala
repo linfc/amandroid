@@ -78,6 +78,7 @@ object Staging_run {
       AndroidReachingFactsAnalysisConfig.k_context = 1
       AndroidReachingFactsAnalysisConfig.resolve_icc = true
       AndroidReachingFactsAnalysisConfig.resolve_static_init = false
+      AndroidReachingFactsAnalysisConfig.timeout = 60
       
       val socket = new AmandroidSocket
       socket.preProcess
@@ -92,7 +93,6 @@ object Staging_run {
         file =>
           try{
             msg_critical(TITLE, "####" + file + "#####")
-            AndroidReachingFactsAnalysisConfig.timerOpt = Some(new Timer(60))
             val app_info = new AppInfoCollector(file)
             socket.loadApk(file, outputPath, AndroidLibraryAPISummary, app_info)
             socket.plugListener(new StagingListener(file, outputPath))
