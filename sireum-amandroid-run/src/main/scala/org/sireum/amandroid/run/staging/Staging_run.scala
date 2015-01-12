@@ -32,7 +32,7 @@ object Staging_run {
     override def toString : String = "total: " + total
   }
   
-  private class StagingListener(source_apk : FileResourceUri, outputPath : String) extends AmandroidSocketListener {
+  private class StagingListener(source_apk : FileResourceUri, outputPath : String, gDB : GraphDB) extends AmandroidSocketListener {
     def onPreAnalysis: Unit = {
       StagingCounter.total += 1
     }
@@ -49,7 +49,7 @@ object Staging_run {
 		    res =>
 		      val idfg = res._2
 		      val apk = FileUtil.filename(source_apk)
-		      GraphDB.storeIdfg(apk, res._1.getName, idfg)
+		      gDB.storeIdfg(apk, res._1.getName, idfg)
 		  }
 		  
     }
@@ -68,8 +68,8 @@ object Staging_run {
   }
   
   def main(args: Array[String]): Unit = {
-    if(args.size != 2){
-      System.err.print("Usage: source_path dest_path")
+    if(args.size != 5){
+      System.err.print("Usage: source_path dest_path db_path db_username db_password")
       return
     }
     MessageCenter.msglevel = MessageCenter.MSG_LEVEL.CRITICAL
@@ -78,14 +78,19 @@ object Staging_run {
       AndroidReachingFactsAnalysisConfig.k_context = 1
       AndroidReachingFactsAnalysisConfig.resolve_icc = true
       AndroidReachingFactsAnalysisConfig.resolve_static_init = false
-      AndroidReachingFactsAnalysisConfig.timeout = 60
+      AndroidReachingFactsAnalysisConfig.timeout = 30
       
       val socket = new AmandroidSocket
       socket.preProcess
       
       val sourcePath = args(0)
       val outputPath = args(1)
+      val dbPath = args(2)
+      val dbUsername = args(3)
+      val dbPassword = args(4)
       
+      val gDB = new GraphDB(dbPath, dbUsername, dbPassword)
+      gDB.initForIdfg
       
       val files = FileUtil.listFiles(FileUtil.toUri(sourcePath), ".apk", true).toSet
       
@@ -93,9 +98,9 @@ object Staging_run {
         file =>
           try{
             msg_critical(TITLE, "####" + file + "#####")
-            val app_info = new AppInfoCollector(file)
+            val app_info = new AppInfoCollector(file, Some(new Timer(30)))
             socket.loadApk(file, outputPath, AndroidLibraryAPISummary, app_info)
-            socket.plugListener(new StagingListener(file, outputPath))
+            socket.plugListener(new StagingListener(file, outputPath, gDB))
             socket.runWithoutDDA(false, true)
           } catch {
             case e : Throwable =>

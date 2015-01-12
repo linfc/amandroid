@@ -160,13 +160,13 @@ object IntentModel {
 		    intentGetExtra(s, args, retVars(0), currentContext) match{case (n, d) => newFacts ++= n; delFacts ++= d}
 		    byPassFlag = false
 		  case "Landroid/content/Intent;.getIntent:(Ljava/lang/String;)Landroid/content/Intent;" =>  //public static
-		    require(retVars.size == 1)
-		    intentGetExtra(s, args, retVars(0), currentContext) match{case (n, d) => newFacts ++= n; delFacts ++= d}
-		    byPassFlag = false
+//		    require(retVars.size == 1)
+//		    intentGetExtra(s, args, retVars(0), currentContext) match{case (n, d) => newFacts ++= n; delFacts ++= d}
+//		    byPassFlag = false
 		  case "Landroid/content/Intent;.getIntentOld:(Ljava/lang/String;)Landroid/content/Intent;" =>  //public static
-		    require(retVars.size == 1)
-		    intentGetExtra(s, args, retVars(0), currentContext) match{case (n, d) => newFacts ++= n; delFacts ++= d}
-		    byPassFlag = false
+//		    require(retVars.size == 1)
+//		    intentGetExtra(s, args, retVars(0), currentContext) match{case (n, d) => newFacts ++= n; delFacts ++= d}
+//		    byPassFlag = false
 		  case "Landroid/content/Intent;.getLongArrayExtra:(Ljava/lang/String;)[J" =>  //public
 		    require(retVars.size == 1)
 		    intentGetExtra(s, args, retVars(0), currentContext) match{case (n, d) => newFacts ++= n; delFacts ++= d}

@@ -16,12 +16,13 @@ import org.sireum.jawa.Center
 import org.sireum.amandroid.AndroidConstants
 import org.sireum.amandroid.AppCenter
 import org.sireum.jawa.MessageCenter._
+import org.sireum.jawa.util.Timer
 
 /**
  * @author <a href="mailto:fgwei@k-state.edu">Fengguo Wei</a>
  * @author <a href="mailto:sroy@k-state.edu">Sankardas Roy</a>
  */ 
-class InterestingApiCollector (apkUri : FileResourceUri) extends AppInfoCollector(apkUri) {
+class InterestingApiCollector (apkUri : FileResourceUri, timerOpt : Option[Timer] = None) extends AppInfoCollector(apkUri, timerOpt) {
   private final val TITLE = "InterestingApiCollector"
   var ra : ReachableInfoCollector = null
   

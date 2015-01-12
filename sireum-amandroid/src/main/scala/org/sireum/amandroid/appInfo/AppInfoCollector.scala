@@ -33,13 +33,14 @@ import org.sireum.amandroid.pilarCodeGenerator.AndroidEntryPointConstants
 import java.io.File
 import java.net.URI
 import org.sireum.jawa.util.IgnoreException
+import org.sireum.jawa.util.Timer
 
 /**
  * adapted from Steven Arzt of the FlowDroid group
  * 
  * @author <a href="mailto:fgwei@k-state.edu">Fengguo Wei</a>
  */
-class AppInfoCollector(apkUri : FileResourceUri) {  
+class AppInfoCollector(apkUri : FileResourceUri, timerOpt : Option[Timer] = None) {  
   private final val TITLE = "AppInfoCollector"
   protected var uses_permissions : ISet[String] = isetEmpty
 	protected var callbackMethods : Map[JawaRecord, Set[JawaProcedure]] = Map()
@@ -152,7 +153,7 @@ class AppInfoCollector(apkUri : FileResourceUri) {
 	  val mfp = AppInfoCollector.analyzeManifest(apkUri)
 	  val afp = AppInfoCollector.analyzeARSC(apkUri)
 		val lfp = AppInfoCollector.analyzeLayouts(apkUri, mfp)
-		val ra = AppInfoCollector.reachabilityAnalysis(mfp)
+		val ra = AppInfoCollector.reachabilityAnalysis(mfp, timerOpt)
 		val callbacks = AppInfoCollector.analyzeCallback(afp, lfp, ra)
 		
 		this.appPackageName = mfp.getPackageName
@@ -260,9 +261,9 @@ object AppInfoCollector {
 		callbackMethods
 	}
 	
-	def reachabilityAnalysis(mfp : ManifestParser) : ReachableInfoCollector = {
+	def reachabilityAnalysis(mfp : ManifestParser, timerOpt : Option[Timer] = None) : ReachableInfoCollector = {
 	  // Collect the callback interfaces implemented in the app's source code
-		val analysisHelper = new ReachableInfoCollector(mfp.getComponentInfos.map(_.name)) 
+		val analysisHelper = new ReachableInfoCollector(mfp.getComponentInfos.map(_.name), timerOpt) 
 	  analysisHelper.init
 //	  this.sensitiveLayoutContainers = analysisHelper.getSensitiveLayoutContainer(this.layoutControls)
 		analysisHelper
