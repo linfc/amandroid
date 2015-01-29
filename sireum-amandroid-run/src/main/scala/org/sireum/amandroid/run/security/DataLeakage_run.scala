@@ -109,7 +109,7 @@ object DataLeakage_run {
       files.foreach{
         file =>
           try{
-            msg_critical(TITLE, "####" + file + "#####")
+            msg_critical(TITLE, "#####" + file + "#####")
             socket.loadApk(file, outputPath, AndroidLibraryAPISummary)
             val app_info = new AppInfoCollector(file)
             app_info.collectInfo
