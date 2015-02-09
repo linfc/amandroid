@@ -11,7 +11,6 @@ import org.sireum.jawa.alir.interProcedural.InterProceduralMonotoneDataFlowAnaly
 import org.sireum.alir.Slot
 import org.sireum.jawa.JawaProcedure
 import org.sireum.util._
-import org.sireum.jawa.alir.interProcedural.InterProceduralMonotoneDataFlowAnalysisFramework
 import org.sireum.pilar.ast._
 import org.sireum.jawa.alir.interProcedural.InterProceduralMonotonicFunction
 import org.sireum.jawa.alir.Context
@@ -39,6 +38,9 @@ import org.sireum.jawa.Mode
 import scala.collection.immutable.BitSet
 import org.sireum.jawa.util.Timer
 import java.io.PrintWriter
+import org.sireum.jawa.alir.interProcedural.InterProceduralMonotoneDataFlowAnalysisFrameworkExtended
+import org.sireum.jawa.alir.interProcedural.InterProceduralMonotoneDataFlowAnalysisFramework
+import org.sireum.jawa.alir.interProcedural.InterProceduralMonotoneDataFlowAnalysisResultExtended
 
 /**
  * @author <a href="mailto:fgwei@k-state.edu">Fengguo Wei</a>
@@ -73,6 +75,30 @@ class AndroidReachingFactsAnalysisBuilder(clm : ClassLoadManager){
       true, true, false, AndroidReachingFactsAnalysisConfig.parallel, gen, kill, callr, iota, initial, switchAsOrderedMatch, Some(nl))
     (cg, result)
   }
+  
+  
+   def buildGeneral //
+  (entryPointProc : JawaProcedure,
+      existingCg : InterproceduralControlFlowGraph[CGNode],
+      existingIrfaResult : InterProceduralMonotoneDataFlowAnalysisResultExtended[RFAFact],
+   initialFacts : ISet[RFAFact] = isetEmpty,
+   initContext : Context,
+   switchAsOrderedMatch : Boolean) : (InterproceduralControlFlowGraph[CGNode], AndroidReachingFactsAnalysisExtended.Result) = {
+    val gen = new Gen
+    val kill = new Kill
+    val callr = new Callr
+    val nl = new NodeL
+    val initial : ISet[RFAFact] = isetEmpty
+    val cg = if(existingCg==null) new InterproceduralControlFlowGraph[CGNode] else existingCg
+    this.icfg = cg
+    if(existingCg==null)
+      cg.collectCfgToBaseGraph(entryPointProc, initContext, true)
+    val iota : ISet[RFAFact] = initialFacts + RFAFact(VarSlot("@@RFAiota"), NullInstance(initContext))
+    val result = InterProceduralMonotoneDataFlowAnalysisFrameworkExtended[RFAFact](cg, existingIrfaResult,
+      true, true, false, AndroidReachingFactsAnalysisConfig.parallel, gen, kill, callr, iota, initial, switchAsOrderedMatch, Some(nl))
+    (cg, result)
+  }
+  
   
   private def checkAndLoadClassFromHierarchy(me : JawaRecord, s : ISet[RFAFact], currentNode : CGLocNode) : Unit = {
     if(me.hasSuperClass){
@@ -669,4 +695,19 @@ object AndroidReachingFactsAnalysis {
    initContext : Context = new Context(GlobalConfig.CG_CONTEXT_K),
    switchAsOrderedMatch : Boolean = false) : (InterproceduralControlFlowGraph[Node], Result)
 				   = new AndroidReachingFactsAnalysisBuilder(clm).build(entryPointProc, initialFacts, initContext, switchAsOrderedMatch)
+}
+
+
+object AndroidReachingFactsAnalysisExtended {
+  type Node = CGNode
+  final val ICC_EDGE = "icc"
+  type Result = InterProceduralMonotoneDataFlowAnalysisResultExtended[RFAFact]
+  def apply(entryPointProc : JawaProcedure,
+      existingCg : InterproceduralControlFlowGraph[CGNode],
+      existingIrfaResult : InterProceduralMonotoneDataFlowAnalysisResultExtended[RFAFact],
+   initialFacts : ISet[RFAFact] = isetEmpty,
+   clm : ClassLoadManager,
+   initContext : Context = new Context(GlobalConfig.CG_CONTEXT_K),
+   switchAsOrderedMatch : Boolean = false) : (InterproceduralControlFlowGraph[Node], Result)
+           = new AndroidReachingFactsAnalysisBuilder(clm).buildGeneral(entryPointProc, existingCg, existingIrfaResult,initialFacts, initContext, switchAsOrderedMatch)
 }

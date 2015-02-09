@@ -34,6 +34,9 @@ import org.sireum.jawa.JawaProcedure
 import org.sireum.util.FileResourceUri
 import org.sireum.jawa.alir.Context
 import org.sireum.amandroid.decompile.AmDecoder
+import java.io.PrintWriter
+import org.sireum.amandroid.alir.reachingFactsAnalysis.AndroidReachingFactsAnalysisExtended
+
 
 /**
  * @author <a href="mailto:fgwei@k-state.edu">Fengguo Wei</a>
@@ -60,11 +63,11 @@ class AmandroidSocket {
   def preProcess : Unit = {
     if(dirtyFlag) throw new RuntimeException("Before your analysis please call cleanEnv first.")
     dirtyFlag = true
-    val imgfile = new File(AndroidGlobalConfig.android_libsummary_dir + "/AndroidLibSummary.xml.zip")
+   // val imgfile = new File(AndroidGlobalConfig.android_libsummary_dir + "/AndroidLibSummary.xml.zip")
     JawaCodeSource.preLoad(FileUtil.toUri(AndroidGlobalConfig.android_lib_dir), GlobalConfig.PILAR_FILE_EXT)
-    val libsum_file = new File(AndroidGlobalConfig.android_libsummary_dir + "/AndroidLibSideEffectResult.xml.zip")
-    if(libsum_file.exists())
-      LibSideEffectProvider.init(libsum_file)
+//    val libsum_file = new File(AndroidGlobalConfig.android_libsummary_dir + "/AndroidLibSideEffectResult.xml.zip")
+//    if(libsum_file.exists())
+//      LibSideEffectProvider.init(libsum_file)
   }
   
   def plugListener(listener : AmandroidSocketListener): Unit = {
@@ -166,7 +169,7 @@ class AmandroidSocket {
     	    try{
 	    	    msg_critical(TITLE, "--------------Component " + ep + "--------------")
 	    	    val initialfacts = AndroidRFAConfig.getInitialFactsForMainEnvironment(ep)
-	    	    val (icfg, irfaResult) = AndroidReachingFactsAnalysis(ep, initialfacts, new ClassLoadManager)
+	    	    val (icfg, irfaResult) = AndroidReachingFactsAnalysis(ep, initialfacts, new ClassLoadManager)     
 	    	    AppCenter.addInterproceduralReachingFactsAnalysisResult(ep.getDeclaringRecord, icfg, irfaResult)
 	    	    msg_critical(TITLE, "processed-->" + icfg.getProcessed.size)
 	    	    val iddResult = InterproceduralDataDependenceAnalysis(icfg, irfaResult)
@@ -187,4 +190,82 @@ class AmandroidSocket {
     	msg_critical(TITLE, "************************************\n")
     }
   }
+  
+  def runCompMerge(
+            public_only : Boolean,
+            parallel : Boolean
+            ) = {    
+    try{
+      if(myListener_opt.isDefined) myListener_opt.get.onPreAnalysis
+      
+      // before starting the analysis of the current app, first reset the Center which may still hold info (of the resolved records) from the previous analysis
+
+      var entryPoints = Center.getEntryPoints(AndroidConstants.MAINCOMP_ENV)
+      
+      if(!public_only)
+        entryPoints ++= Center.getEntryPoints(AndroidConstants.COMP_ENV)
+      
+      if(myListener_opt.isDefined) 
+        entryPoints = myListener_opt.get.entryPointFilter(entryPoints)
+  
+      {if(parallel) entryPoints.par else entryPoints}.foreach{
+        ep =>
+          try{
+            msg_critical(TITLE, "--------------Component " + ep + "--------------")
+            val initialfacts = AndroidRFAConfig.getInitialFactsForMainEnvironment(ep)
+            val (icfg, irfaResult) = AndroidReachingFactsAnalysisExtended(ep, null, null, initialfacts, new ClassLoadManager)
+     
+            System.out.println("icfg and irfaRes done")
+            
+            val (icfg2, irfaResult2) = AndroidReachingFactsAnalysisExtended(ep, icfg, null, initialfacts, new ClassLoadManager)
+        
+            System.out.println("icfg2 and irfaRes2 done")
+            
+            
+            
+            val outputDir = AndroidGlobalConfig.amandroid_home + "/output"            
+            val dotDirFile = new File(outputDir + "/" + "toDot")
+            if(!dotDirFile.exists()) dotDirFile.mkdirs()           
+            val out = new PrintWriter(dotDirFile.getAbsolutePath + "/"+ ep.getShortName +"icfg.dot")
+            icfg.toDot(out)
+            out.close()
+            
+            val out2 = new PrintWriter(dotDirFile.getAbsolutePath + "/" + ep.getShortName +"icfg2.dot")
+            icfg2.toDot(out2)
+            out2.close()
+            
+            val irfaResDirFile = new File(outputDir + "/" + "irfaResult")
+            if(!irfaResDirFile.exists()) irfaResDirFile.mkdirs()
+            val irfaOut = new PrintWriter(irfaResDirFile.getAbsolutePath + "/"+ ep.getShortName + "irfaRes.txt")
+            irfaOut.print(irfaResult.toString())
+            irfaOut.close()
+            
+            val irfaOut2 = new PrintWriter(irfaResDirFile.getAbsolutePath + "/"+ ep.getShortName + "irfaRes2.txt")
+            irfaOut2.print(irfaResult2.toString())
+            irfaOut2.close()
+            
+            msg_critical(TITLE,"--------------------------icfg and irfaResult are stored in file --------------")
+            
+            
+            AppCenter.addInterproceduralReachingFactsAnalysisResult(ep.getDeclaringRecord, icfg, irfaResult)
+            msg_critical(TITLE, "processed-->" + icfg.getProcessed.size)
+            val iddResult = InterproceduralDataDependenceAnalysis(icfg, irfaResult)
+            AppCenter.addInterproceduralDataDependenceAnalysisResult(ep.getDeclaringRecord, iddResult)
+          } catch {
+            case te : TimeOutException => 
+              err_msg_critical(TITLE, "Timeout!")
+              if(myListener_opt.isDefined) myListener_opt.get.onTimeout
+          }
+      } 
+  
+      if(myListener_opt.isDefined) myListener_opt.get.onAnalysisSuccess
+    } catch {
+      case e : Exception => 
+        if(myListener_opt.isDefined) myListener_opt.get.onException(e)
+    } finally {
+      if(myListener_opt.isDefined) myListener_opt.get.onPostAnalysis
+      msg_critical(TITLE, "************************************\n")
+    }
+  }
+  
 }
