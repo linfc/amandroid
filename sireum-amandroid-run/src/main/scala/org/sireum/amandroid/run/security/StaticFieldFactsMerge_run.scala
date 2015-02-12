@@ -108,7 +108,7 @@ object StaticFieldFactsMerge_run {
     AndroidReachingFactsAnalysisConfig.k_context = 1
     AndroidReachingFactsAnalysisConfig.resolve_icc = false
     AndroidReachingFactsAnalysisConfig.resolve_static_init = false
-    AndroidReachingFactsAnalysisConfig.timeout = 1
+    AndroidReachingFactsAnalysisConfig.timeout = 5
     val socket = new AmandroidSocket
     socket.preProcess
     

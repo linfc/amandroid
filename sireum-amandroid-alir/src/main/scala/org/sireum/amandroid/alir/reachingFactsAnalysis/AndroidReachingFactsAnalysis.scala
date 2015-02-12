@@ -85,6 +85,7 @@ class AndroidReachingFactsAnalysisBuilder(clm : ClassLoadManager){
    initContext : Context,
    switchAsOrderedMatch : Boolean) : (InterproceduralControlFlowGraph[CGNode], AndroidReachingFactsAnalysisExtended.Result) = {
     val gen = new Gen
+    val extraGen = new ExtraGen
     val kill = new Kill
     val callr = new Callr
     val nl = new NodeL
@@ -95,7 +96,7 @@ class AndroidReachingFactsAnalysisBuilder(clm : ClassLoadManager){
       cg.collectCfgToBaseGraph(entryPointProc, initContext, true)
     val iota : ISet[RFAFact] = initialFacts + RFAFact(VarSlot("@@RFAiota"), NullInstance(initContext))
     val result = InterProceduralMonotoneDataFlowAnalysisFrameworkExtended[RFAFact](cg, existingIrfaResult,
-      true, true, false, AndroidReachingFactsAnalysisConfig.parallel, gen, kill, callr, iota, initial, switchAsOrderedMatch, Some(nl))
+      true, true, false, AndroidReachingFactsAnalysisConfig.parallel, gen, extraGen, kill, callr, iota, initial, switchAsOrderedMatch, Some(nl))
     (cg, result)
   }
   
@@ -305,6 +306,33 @@ class AndroidReachingFactsAnalysisBuilder(clm : ClassLoadManager){
     }
   }
 
+  // the following MDF function can produce extra results e.g. global information such as static field facts; 
+  // we cannot produce these facts through Gen because these facts do not correspond to the nodes of icfg
+  class ExtraGen
+      extends InterProceduralMonotonicFunction[RFAFact] {
+        
+    def apply(s : ISet[RFAFact], a : Assignment, currentNode : CGLocNode) : ISet[RFAFact] = {
+      var result : ISet[RFAFact] = isetEmpty
+      if(ReachingFactsAnalysisHelper.isStaticFieldWrite(a)){
+        val lhss = PilarAstHelper.getLHSs(a)
+        val rhss = PilarAstHelper.getRHSs(a)
+        val slots = ReachingFactsAnalysisHelper.processLHSs(lhss, s, currentNode.getContext)    
+        val values = ReachingFactsAnalysisHelper.processRHSs(rhss, s , currentNode.getContext) 
+        slots.foreach{
+          case(i, (slot, _)) =>
+            if(values.contains(i))
+              result ++= values(i).map{v => RFAFact(slot, v)}
+        }        
+      }      
+      result
+    }
+
+    def apply(s : ISet[RFAFact], e : Exp, currentNode : CGLocNode) : ISet[RFAFact] = isetEmpty
+    
+    def apply(s : ISet[RFAFact], a : Action, currentNode : CGLocNode) : ISet[RFAFact] = isetEmpty
+  }
+  
+  
   class Kill
       extends InterProceduralMonotonicFunction[RFAFact] {
     

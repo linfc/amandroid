@@ -16,6 +16,7 @@ import org.sireum.jawa.alir.Context
 import org.sireum.jawa.GlobalConfig
 import org.sireum.jawa.JawaRecord
 import org.sireum.jawa.Center
+import org.sireum.jawa.alir.controlFlowGraph.CGNode
 
 /**
  * @author <a href="mailto:fgwei@k-state.edu">Fengguo Wei</a>
@@ -42,4 +43,14 @@ object AndroidRFAConfig {
 //	  result += RFAFact(mCategoriesSlot, mCategoriesValue)
 	  result
 	}
+
+
+ def getInitialGlobalFacts(dm : JawaRecord) : ISet[RFAFact] = {
+  Set()
+ }
+ 
+ def getInitialHoleNodes(dm : JawaRecord) : ISet[CGNode] = {
+  Set()
+ }
+ 
 }

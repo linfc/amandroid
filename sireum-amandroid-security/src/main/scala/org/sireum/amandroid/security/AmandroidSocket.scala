@@ -36,6 +36,12 @@ import org.sireum.jawa.alir.Context
 import org.sireum.amandroid.decompile.AmDecoder
 import java.io.PrintWriter
 import org.sireum.amandroid.alir.reachingFactsAnalysis.AndroidReachingFactsAnalysisExtended
+import org.sireum.util.ISet
+import org.sireum.jawa.alir.controlFlowGraph.CGNode
+import org.sireum.jawa.alir.reachingFactsAnalysis.RFAFact
+import org.sireum.jawa.alir.controlFlowGraph.InterproceduralControlFlowGraph
+import org.sireum.util.IMap
+import org.sireum.jawa.JawaRecord
 
 
 /**
@@ -208,54 +214,98 @@ class AmandroidSocket {
       if(myListener_opt.isDefined) 
         entryPoints = myListener_opt.get.entryPointFilter(entryPoints)
   
-      {if(parallel) entryPoints.par else entryPoints}.foreach{
-        ep =>
-          try{
-            msg_critical(TITLE, "--------------Component " + ep + "--------------")
-            val initialfacts = AndroidRFAConfig.getInitialFactsForMainEnvironment(ep)
-            val (icfg, irfaResult) = AndroidReachingFactsAnalysisExtended(ep, null, null, initialfacts, new ClassLoadManager)
-     
-            System.out.println("icfg and irfaRes done")
-            
-            val (icfg2, irfaResult2) = AndroidReachingFactsAnalysisExtended(ep, icfg, null, initialfacts, new ClassLoadManager)
+      //initialize each component's holeNodes and sharable local facts
+        var holeNodesMap : IMap[JawaRecord, ISet[CGNode]] = Map()
+        var globalFactsMap : IMap[JawaRecord, ISet[RFAFact]] = Map()
+        var icfgMap : IMap[JawaRecord, InterproceduralControlFlowGraph[CGNode]] = Map()
+        var irfaResultMap : IMap[JawaRecord, AndroidReachingFactsAnalysisExtended.Result] = Map()
+        var aggGlobalFacts : ISet[RFAFact] = Set()
         
-            System.out.println("icfg2 and irfaRes2 done")
-            
-            
-            
-            val outputDir = AndroidGlobalConfig.amandroid_home + "/output"            
-            val dotDirFile = new File(outputDir + "/" + "toDot")
-            if(!dotDirFile.exists()) dotDirFile.mkdirs()           
-            val out = new PrintWriter(dotDirFile.getAbsolutePath + "/"+ ep.getShortName +"icfg.dot")
-            icfg.toDot(out)
-            out.close()
-            
-            val out2 = new PrintWriter(dotDirFile.getAbsolutePath + "/" + ep.getShortName +"icfg2.dot")
-            icfg2.toDot(out2)
-            out2.close()
-            
-            val irfaResDirFile = new File(outputDir + "/" + "irfaResult")
-            if(!irfaResDirFile.exists()) irfaResDirFile.mkdirs()
-            val irfaOut = new PrintWriter(irfaResDirFile.getAbsolutePath + "/"+ ep.getShortName + "irfaRes.txt")
-            irfaOut.print(irfaResult.toString())
-            irfaOut.close()
-            
-            val irfaOut2 = new PrintWriter(irfaResDirFile.getAbsolutePath + "/"+ ep.getShortName + "irfaRes2.txt")
-            irfaOut2.print(irfaResult2.toString())
-            irfaOut2.close()
-            
-            msg_critical(TITLE,"--------------------------icfg and irfaResult are stored in file --------------")
-            
-            
-            AppCenter.addInterproceduralReachingFactsAnalysisResult(ep.getDeclaringRecord, icfg, irfaResult)
-            msg_critical(TITLE, "processed-->" + icfg.getProcessed.size)
-            val iddResult = InterproceduralDataDependenceAnalysis(icfg, irfaResult)
-            AppCenter.addInterproceduralDataDependenceAnalysisResult(ep.getDeclaringRecord, iddResult)
-          } catch {
-            case te : TimeOutException => 
-              err_msg_critical(TITLE, "Timeout!")
-              if(myListener_opt.isDefined) myListener_opt.get.onTimeout
-          }
+      entryPoints.map { 
+        ep => 
+               holeNodesMap += (ep.getDeclaringRecord -> AndroidRFAConfig.getInitialHoleNodes(ep.getDeclaringRecord))
+               globalFactsMap += (ep.getDeclaringRecord -> AndroidRFAConfig.getInitialGlobalFacts(ep.getDeclaringRecord))
+               
+              val initialfacts = AndroidRFAConfig.getInitialFactsForMainEnvironment(ep)
+              val (icfg, irfaResult) = AndroidReachingFactsAnalysisExtended(ep, null, null, initialfacts, new ClassLoadManager)
+              icfgMap +=(ep.getDeclaringRecord -> icfg)
+              irfaResultMap += (ep.getDeclaringRecord -> irfaResult)
+              holeNodesMap += (ep.getDeclaringRecord -> irfaResult.getHoleNodes())
+              globalFactsMap +=(ep.getDeclaringRecord -> irfaResult.getExtraFacts())
+       }
+      
+      
+      //inter-component merging starts
+      var converged = false
+      
+      while(converged != true){
+        converged = true
+        entryPoints.map {
+          ep => aggGlobalFacts ++= globalFactsMap(ep.getDeclaringRecord)
+        }
+        
+        System.out.println(" aggGlobalFacts extra facts  = " + aggGlobalFacts.toString)
+        
+        {if(parallel) entryPoints.par else entryPoints}.foreach{
+          ep =>
+            try{
+              msg_critical(TITLE, "--------------Component " + ep + "--------------")
+              
+              globalFactsMap += (ep.getDeclaringRecord -> aggGlobalFacts)
+              
+              val initialfacts = AndroidRFAConfig.getInitialFactsForMainEnvironment(ep)
+              val preIcfg = icfgMap(ep.getDeclaringRecord)
+              var preIrfaResult = irfaResultMap(ep.getDeclaringRecord)
+              
+              preIrfaResult.setExtrafacts(aggGlobalFacts)
+              
+              val (icfg, irfaResult) = AndroidReachingFactsAnalysisExtended(ep, preIcfg, preIrfaResult, initialfacts, new ClassLoadManager)
+              
+              icfgMap +=(ep.getDeclaringRecord -> icfg)
+              irfaResultMap += (ep.getDeclaringRecord -> irfaResult)
+//     
+//              System.out.println("icfg and irfaRes done. " + " holeNodes num = " + irfaResult.getHoleNodes().size)
+//              System.out.println(" irfaRes extra facts size = " + irfaResult.getExtraFacts().toString)
+//              val (icfg2, irfaResult2) = AndroidReachingFactsAnalysisExtended(ep, icfg, null, initialfacts, new ClassLoadManager)
+//        
+              System.out.println("icfg and irfaRes done. " + " holeNodes num = " + irfaResult.getHoleNodes().size)
+              System.out.println(" irfaRes extra facts size = " + irfaResult.getExtraFacts().toString)
+//           
+//              val outputDir = AndroidGlobalConfig.amandroid_home + "/output"            
+//              val dotDirFile = new File(outputDir + "/" + "toDot")
+//              if(!dotDirFile.exists()) dotDirFile.mkdirs()           
+//              val out = new PrintWriter(dotDirFile.getAbsolutePath + "/"+ ep.getShortName +"icfg.dot")
+//              icfg.toDot(out)
+//              out.close()
+//            
+//              val out2 = new PrintWriter(dotDirFile.getAbsolutePath + "/" + ep.getShortName +"icfg2.dot")
+//              icfg2.toDot(out2)
+//              out2.close()
+//            
+//              val irfaResDirFile = new File(outputDir + "/" + "irfaResult")
+//              if(!irfaResDirFile.exists()) irfaResDirFile.mkdirs()
+//              val irfaOut = new PrintWriter(irfaResDirFile.getAbsolutePath + "/"+ ep.getShortName + "irfaRes.txt")
+//              irfaOut.print(irfaResult.toString())
+//              irfaOut.close()
+//            
+//              val irfaOut2 = new PrintWriter(irfaResDirFile.getAbsolutePath + "/"+ ep.getShortName + "irfaRes2.txt")
+//              irfaOut2.print(irfaResult2.toString())
+//              irfaOut2.close()
+//            
+//              msg_critical(TITLE,"--------------------------icfg and irfaResult are stored in file --------------")
+//            
+//            
+//              AppCenter.addInterproceduralReachingFactsAnalysisResult(ep.getDeclaringRecord, icfg, irfaResult)
+//              msg_critical(TITLE, "processed-->" + icfg.getProcessed.size)
+//              val iddResult = InterproceduralDataDependenceAnalysis(icfg, irfaResult)
+//              AppCenter.addInterproceduralDataDependenceAnalysisResult(ep.getDeclaringRecord, iddResult)
+            } catch {
+              case te : TimeOutException => 
+                err_msg_critical(TITLE, "Timeout!")
+                if(myListener_opt.isDefined) myListener_opt.get.onTimeout
+            }
+        }   
+          
       } 
   
       if(myListener_opt.isDefined) myListener_opt.get.onAnalysisSuccess
